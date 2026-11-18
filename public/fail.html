@@ -1,0 +1,91 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>결제 실패 - 마감일 캘린더</title>
+<style>
+  * { box-sizing: border-box; }
+  body {
+    font-family: "Pretendard", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    background: #f5f6f8;
+    margin: 0;
+    padding: 24px;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    min-height: 100vh;
+    color: #191f28;
+  }
+  .wrap { width: 100%; max-width: 440px; }
+  .card {
+    background: #fff;
+    border-radius: 20px;
+    padding: 32px 24px;
+    box-shadow: 0 4px 24px rgba(0,0,0,0.06);
+    border: 1px solid #f0f2f5;
+    text-align: center;
+  }
+  .icon-fail {
+    width: 60px; height: 60px;
+    margin: 0 auto 18px;
+    border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 28px;
+    background: #fff0ef; color: #e11d48;
+  }
+  h1 { font-size: 22px; font-weight: 800; margin: 0 0 8px; }
+  p.sub { font-size: 14px; color: #8b95a1; margin: 0 0 20px; }
+  .error-box {
+    background: #fff5f4;
+    border: 1px solid #ffd9d6;
+    border-radius: 12px;
+    padding: 14px 16px;
+    font-size: 13.5px;
+    color: #b3160f;
+    text-align: left;
+    margin-bottom: 24px;
+    word-break: break-all;
+  }
+  .btn-primary {
+    display: block;
+    width: 100%;
+    padding: 15px;
+    background: #0064ff;
+    color: #fff;
+    border: none;
+    border-radius: 12px;
+    font-size: 15.5px;
+    font-weight: 700;
+    text-decoration: none;
+    cursor: pointer;
+  }
+  .btn-sub {
+    display: inline-block;
+    margin-top: 14px;
+    color: #8b95a1;
+    font-size: 13.5px;
+    text-decoration: none;
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="card">
+    <div class="icon-fail">✕</div>
+    <h1>결제가 진행되지 않았습니다</h1>
+    <p class="sub">사용자 취소 또는 결제 인증 중 문제가 발생했습니다.</p>
+    <div class="error-box" id="err-desc">오류 정보를 불러오는 중...</div>
+    <a href="/checkout-popup.html" class="btn-primary">결제 다시 시도</a>
+    <a href="/" class="btn-sub">마감일 캘린더 메인으로 돌아가기</a>
+  </div>
+</div>
+<script>
+  const params = new URLSearchParams(window.location.search);
+  const code = params.get("code") || "UNKNOWN";
+  const message = params.get("message") || "사용자가 결제를 취소했거나 승인이 거절되었습니다.";
+  document.getElementById("err-desc").innerHTML = `<strong>[${code}]</strong> ${message}`;
+</script>
+</body>
+</html>
+

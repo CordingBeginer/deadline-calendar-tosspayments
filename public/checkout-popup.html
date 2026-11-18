@@ -1,0 +1,199 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>프리미엄 전환 - 마감일 캘린더</title>
+<script src="https://js.tosspayments.com/v1/payment"></script>
+<style>
+  * { box-sizing: border-box; }
+  body {
+    font-family: "Pretendard", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    background: #f5f6f8;
+    margin: 0;
+    padding: 24px 20px;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    min-height: 100vh;
+  }
+  .wrap { width: 100%; max-width: 420px; margin: auto 0; }
+  .card {
+    background: #fff;
+    border-radius: 18px;
+    padding: 24px;
+    box-shadow: 0 4px 16px rgba(0,0,0,0.06);
+    margin-bottom: 16px;
+    border: 1px solid #f0f2f5;
+  }
+  .badge-plan {
+    display: inline-block;
+    background: #eff6ff;
+    color: #3182f6;
+    font-size: 11px;
+    font-weight: 800;
+    padding: 3px 8px;
+    border-radius: 6px;
+    margin-bottom: 8px;
+  }
+  .plan-title { font-size: 21px; font-weight: 800; margin-bottom: 4px; color: #191f28; }
+  .plan-sub { color: #6b7280; font-size: 14px; margin-bottom: 16px; }
+  .price { font-size: 30px; font-weight: 800; color: #3182f6; margin-bottom: 20px; letter-spacing: -0.5px; }
+  .price span { font-size: 15px; font-weight: 400; color: #6b7280; }
+  ul.features { list-style: none; padding: 0; margin: 0; }
+  ul.features li {
+    padding: 9px 0; font-size: 14px; color: #333d4b;
+    display: flex; align-items: center; gap: 8px;
+    border-bottom: 1px solid #f9fafb;
+  }
+  ul.features li:last-child { border-bottom: none; }
+  ul.features li::before {
+    content: "✓";
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 18px;
+    height: 18px;
+    background: #eff6ff;
+    color: #3182f6;
+    font-weight: 800;
+    font-size: 11px;
+    border-radius: 50%;
+    flex-shrink: 0;
+  }
+  .method-label {
+    font-size: 13.5px; font-weight: 700; color: #3182f6;
+    background: #eff6ff; border: 1.5px solid #dbeafe; border-radius: 12px;
+    padding: 12px; text-align: center; margin-bottom: 14px;
+    display: flex; align-items: center; justify-content: center; gap: 6px;
+  }
+  #payment-button {
+    width: 100%; padding: 16px;
+    background: #3182f6; color: #fff; border: none; border-radius: 12px;
+    font-size: 16px; font-weight: 700; cursor: pointer;
+    box-shadow: 0 4px 14px rgba(49, 130, 246, 0.25);
+    transition: background 0.15s ease;
+  }
+  #payment-button:hover { background: #1b64da; }
+  #payment-button:disabled { background: #b0b8c1; cursor: not-allowed; box-shadow: none; }
+  .notice { font-size: 12px; color: #9ca3af; text-align: center; margin-top: 14px; line-height: 1.5; }
+  .key-warning {
+    display: none;
+    background: #fff0ef;
+    border: 1px solid #ffd9d6;
+    color: #b3160f;
+    padding: 10px 14px;
+    border-radius: 10px;
+    font-size: 12.5px;
+    margin-bottom: 14px;
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div id="key-alert" class="key-warning"></div>
+
+  <div class="card">
+    <span class="badge-plan">1학기 올패스</span>
+    <div class="plan-title">프리미엄 플랜</div>
+    <div class="plan-sub">학기 단위 1회 결제 (4개월 무제한)</div>
+    <div class="price">4,900<span> 원 / 학기</span></div>
+    <ul class="features">
+      <li>마감일 추출 무제한 (강의계획서, 에타, 공지 단톡방)</li>
+      <li>과목별 통합 캘린더 (전공·교양 한 번에)</li>
+      <li>AI 오차 자동 감지 (날짜-요일 불일치 경고)</li>
+      <li>마감 임박 카톡/이메일 알림</li>
+    </ul>
+  </div>
+
+  <div class="card">
+    <div class="method-label">💳 결제수단: 신용·체크카드</div>
+    <button id="payment-button">4,900원 결제하기</button>
+    <div class="notice">
+      버튼을 누르면 토스페이먼츠 모의 카드결제창이 열립니다.<br/>
+      테스트 카드번호로 결제 가능하며 실제 금액은 청구되지 않습니다.
+    </div>
+  </div>
+</div>
+
+<script>
+  let clientKey = "test_ck_YOUR_CLIENT_KEY";
+  let tossPayments = null;
+
+  const btnPay = document.getElementById("payment-button");
+  const keyAlert = document.getElementById("key-alert");
+
+  // 서버의 .env에서 TOSS_CLIENT_KEY 불러오기
+  async function initToss() {
+    try {
+      const res = await fetch("/api/config");
+      const data = await res.json();
+      if (data.clientKey && !data.clientKey.includes("YOUR_CLIENT_KEY")) {
+        clientKey = data.clientKey;
+      }
+    } catch (e) {
+      console.warn("설정 로드 실패:", e);
+    }
+
+    if (!clientKey || clientKey.includes("YOUR_CLIENT_KEY")) {
+      keyAlert.style.display = "block";
+      keyAlert.innerHTML = `⚠️ <strong>안내:</strong> <code>.env</code> 파일의 <code>TOSS_CLIENT_KEY</code>를 설정해주세요.`;
+    }
+
+    try {
+      tossPayments = TossPayments(clientKey);
+    } catch (err) {
+      console.error("TossPayments 초기화 실패:", err);
+    }
+  }
+
+  initToss();
+
+  btnPay.addEventListener("click", async () => {
+    if (!tossPayments) {
+      alert("토스 결제 모듈 초기화 중입니다. 잠시 후 다시 시도해주세요.");
+      return;
+    }
+
+    const orderId = "order_" + Date.now() + "_" + Math.random().toString(36).slice(2, 8);
+    const amount = 4900;
+    const orderName = "프리미엄 플랜 (1학기)";
+
+    btnPay.disabled = true;
+    btnPay.textContent = "결제창 연결 중...";
+
+    // 1) 서버에 주문 사전 등록 (금액 변조 방지)
+    try {
+      await fetch("/api/payments/create-order", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ orderId, amount, orderName }),
+      });
+    } catch (e) {
+      console.warn("주문 등록 통신 생략:", e);
+    }
+
+    // 2) 토스페이먼츠 카드 결제창 호출
+    // "카드"로 고정 호출하여 간편결제 선택지 없이 모의 카드결제창으로 즉시 진입
+    tossPayments.requestPayment("카드", {
+      amount,
+      orderId,
+      orderName,
+      customerName: "홍길동",
+      customerEmail: "student@univ.ac.kr",
+      successUrl: window.location.origin + "/payment/success",
+      failUrl: window.location.origin + "/payment/fail",
+    }).catch((err) => {
+      btnPay.disabled = false;
+      btnPay.textContent = "4,900원 결제하기";
+
+      if (err.code === "USER_CANCEL") {
+        console.log("사용자가 결제창을 닫았습니다.");
+      } else {
+        alert("결제 요청 중 오류가 발생했습니다: " + (err.message || err.code));
+      }
+    });
+  });
+</script>
+</body>
+</html>

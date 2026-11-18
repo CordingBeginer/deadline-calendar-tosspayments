@@ -1,0 +1,747 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>마감일 캘린더 (로컬 패턴 매칭 + 토스페이먼츠)</title>
+<script src="https://js.tosspayments.com/v1/payment"></script>
+<style>
+  :root {
+    --accent: #ef4444;
+    --accent-soft: #fef2f2;
+    --accent-soft2: #fee2e2;
+    --ink: #18181b;
+    --sub: #71717a;
+    --line: #ececee;
+    --bg: #f7f7f8;
+    --ok: #16a34a;
+    --ok-soft: #f0fdf4;
+    --toss-blue: #0064ff;
+    --toss-soft: #eff6ff;
+  }
+  * { box-sizing: border-box; }
+  body {
+    font-family: "Pretendard", "Apple SD Gothic Neo", -apple-system, sans-serif;
+    margin: 0; background: var(--bg); color: var(--ink); -webkit-font-smoothing: antialiased;
+  }
+  .topbar {
+    background: #fff; border-bottom: 1px solid var(--line); padding: 14px 28px;
+    display: flex; align-items: center; justify-content: space-between; position: sticky; top: 0; z-index: 50;
+  }
+  .logo { font-weight: 800; font-size: 17px; display: flex; align-items: center; gap: 7px; letter-spacing: -0.3px; cursor: pointer; }
+  .logo .dot { width: 8px; height: 8px; background: var(--accent); border-radius: 50%; }
+  .topbar-right { display: flex; align-items: center; gap: 10px; }
+  .demo-btn {
+    background: #f4f4f5; color: #52525b; border: 1px solid #e4e4e7;
+    font-size: 11.5px; font-weight: 700; padding: 6px 12px; border-radius: 8px; cursor: pointer;
+  }
+  .demo-btn:hover { background: #e4e4e7; }
+  .plan-chip {
+    background: var(--ink); color: #fff; font-size: 12px; font-weight: 700;
+    padding: 6px 14px; border-radius: 999px; transition: all 0.2s ease;
+  }
+  .plan-chip.premium { background: var(--toss-blue); }
+
+  .layout {
+    display: grid; grid-template-columns: 1fr 1.25fr; gap: 20px;
+    padding: 24px; max-width: 1260px; margin: 0 auto;
+  }
+  .panel { background: #fff; border-radius: 22px; padding: 22px; border: 1px solid var(--line); }
+  .panel h2 {
+    font-size: 12.5px; color: #a1a1aa; margin: 0 0 16px 0;
+    font-weight: 700; letter-spacing: 0.3px; text-transform: uppercase;
+  }
+  .source-file {
+    display: flex; align-items: center; justify-content: space-between;
+    font-size: 12.5px; color: var(--sub); background: var(--bg);
+    padding: 8px 12px; border-radius: 10px; margin-bottom: 14px;
+  }
+  .source-text {
+    font-size: 14px; line-height: 2; color: #3f3f46; white-space: pre-wrap;
+    background: #fafafa; border: 1px solid var(--line); padding: 14px; border-radius: 12px;
+    max-height: 380px; overflow-y: auto;
+  }
+  mark.evidence {
+    background: var(--accent-soft2); color: #b91c1c; padding: 2px 6px;
+    border-radius: 6px; font-weight: 700; transition: background 0.3s ease;
+  }
+  mark.evidence.highlight-active { background: #fde047; color: #854d0e; }
+
+  textarea#pasteBox {
+    width: 100%; min-height: 150px; border: 1.5px dashed #d4d4d8; border-radius: 14px;
+    padding: 14px; font-size: 13.5px; font-family: inherit; line-height: 1.7; color: #3f3f46;
+    resize: vertical; margin-bottom: 10px; background: var(--bg);
+  }
+  textarea#pasteBox:focus { outline: none; border-color: var(--accent); background: #fff; }
+  .paste-row { display: flex; gap: 8px; margin-bottom: 18px; }
+  .extract-btn {
+    flex: 1; background: var(--ink); color: #fff; border: none;
+    padding: 12px 0; border-radius: 12px; font-weight: 800; font-size: 13.5px; cursor: pointer;
+  }
+  .clear-btn {
+    background: #fff; color: var(--sub); border: 1px solid var(--line);
+    padding: 12px 16px; border-radius: 12px; font-weight: 700; font-size: 13.5px; cursor: pointer;
+  }
+  .divider { border: none; border-top: 1px solid var(--line); margin: 18px 0; }
+
+  .usage-banner {
+    background: linear-gradient(135deg, var(--accent-soft) 0%, #fff 100%); border: 1px solid var(--accent-soft2);
+    border-radius: 18px; padding: 16px 18px; display: flex; align-items: center; justify-content: space-between; margin-bottom: 18px;
+    transition: all 0.3s ease;
+  }
+  .usage-banner.premium-active {
+    background: linear-gradient(135deg, var(--toss-soft) 0%, #fff 100%);
+    border-color: #bfdbfe;
+  }
+  .usage-banner .msg { color: var(--accent); font-weight: 800; font-size: 14px; }
+  .usage-banner.premium-active .msg { color: var(--toss-blue); }
+  .usage-banner .sub { color: var(--sub); font-size: 12.5px; margin-top: 3px; }
+  .upgrade-btn {
+    background: var(--accent); color: #fff; border: none; padding: 10px 18px;
+    border-radius: 999px; font-size: 12.5px; font-weight: 800; cursor: pointer;
+    white-space: nowrap; box-shadow: 0 4px 10px rgba(239,68,68,0.25);
+  }
+
+  .filter-row { display: flex; gap: 8px; margin-bottom: 16px; flex-wrap: wrap; }
+  .filter-chip {
+    font-size: 12.5px; padding: 8px 15px; border-radius: 999px; border: 1px solid var(--line);
+    background: #fff; cursor: pointer; color: #52525b; font-weight: 700; transition: all 0.15s ease;
+  }
+  .filter-chip.active { background: var(--ink); color: #fff; border-color: var(--ink); }
+  .filter-chip.locked { color: #d4d4d8; position: relative; }
+  .filter-chip.locked::after { content: "🔒"; font-size: 10px; margin-left: 4px; }
+  .filter-chip.unlocked { color: var(--toss-blue); border-color: #bfdbfe; background: var(--toss-soft); }
+
+  .card { border: 1px solid var(--line); border-radius: 18px; padding: 18px; margin-bottom: 12px; background: #fff; transition: box-shadow .15s; }
+  .card.warn { border-color: var(--accent-soft2); background: #fffbfa; }
+  .card .row1 { display: flex; justify-content: space-between; align-items: flex-start; }
+  .card .title { font-weight: 800; font-size: 15px; letter-spacing: -0.2px; }
+  .card .course { font-size: 11px; color: #fff; background: #fca5a5; display: inline-block; padding: 3px 9px; border-radius: 999px; margin-top: 6px; font-weight: 700; }
+  .badge { font-size: 11px; font-weight: 800; padding: 5px 11px; border-radius: 999px; }
+  .badge.need { background: var(--accent-soft2); color: var(--accent); }
+  .badge.ok { background: var(--ok-soft); color: var(--ok); }
+  .date-field { margin-top: 14px; display: flex; align-items: center; gap: 9px; font-size: 13.5px; }
+  .date-field input[type="date"] {
+    padding: 8px 11px; border: 1px solid var(--line); border-radius: 11px;
+    font-size: 13.5px; background: var(--bg); font-family: inherit; color: var(--ink);
+  }
+  .mismatch { color: var(--accent); font-size: 12.5px; margin-top: 10px; background: var(--accent-soft); padding: 10px 12px; border-radius: 12px; line-height: 1.5; }
+  .card-actions { margin-top: 14px; display: flex; justify-content: space-between; align-items: center; }
+  .view-origin { background: none; border: none; color: var(--accent); font-size: 12.5px; font-weight: 700; cursor: pointer; padding: 0; }
+  .checkbox-row { display: flex; align-items: center; gap: 6px; font-size: 12.5px; color: var(--sub); font-weight: 600; cursor: pointer; }
+  .checkbox-row input { accent-color: var(--accent); width: 15px; height: 15px; cursor: pointer; }
+  .empty-state { text-align: center; padding: 30px 10px; color: #a1a1aa; font-size: 13px; }
+
+  .premium-feature-card {
+    border: 1.5px dashed #fca5a5; border-radius: 18px; padding: 18px;
+    margin-top: 18px; background: #fff8f8; transition: all 0.3s ease;
+  }
+  .premium-feature-card.active-state { border: 1.5px solid #bfdbfe; background: var(--toss-soft); }
+  .premium-feature-card .ptitle {
+    font-size: 13.5px; font-weight: 800; color: var(--accent);
+    display: flex; align-items: center; gap: 6px; margin-bottom: 6px;
+  }
+  .premium-feature-card.active-state .ptitle { color: var(--toss-blue); }
+  .premium-feature-card .pdesc { font-size: 12.5px; color: var(--sub); margin-bottom: 14px; line-height: 1.5; }
+  .btn-outline {
+    border: 1.5px solid var(--accent); color: var(--accent); background: #fff;
+    padding: 9px 16px; border-radius: 999px; font-size: 12.5px; font-weight: 800; cursor: pointer;
+  }
+
+  .footer-wrap { max-width: 1260px; margin: 0 auto; padding: 0 24px 28px; }
+  .footer-bar {
+    position: sticky; bottom: 16px; background: #fff; border: 1px solid var(--line);
+    padding: 18px 24px; display: flex; justify-content: space-between; align-items: center;
+    border-radius: 20px; box-shadow: 0 8px 24px rgba(0,0,0,0.08); z-index: 40;
+  }
+  .export-btn {
+    background: var(--ink); color: #fff; border: none; padding: 13px 24px;
+    border-radius: 999px; font-weight: 800; font-size: 13.5px; cursor: pointer;
+    transition: background 0.15s ease;
+  }
+  .export-btn:hover { background: #000; }
+  .selected-count { font-size: 13px; color: #a1a1aa; font-weight: 700; }
+
+  /* 토스 결제 모달 레이어 */
+  .modal-overlay {
+    position: fixed; top: 0; left: 0; right: 0; bottom: 0;
+    background: rgba(0,0,0,0.55); display: none; justify-content: center; align-items: center;
+    z-index: 100; backdrop-filter: blur(3px);
+  }
+  .modal-overlay.open { display: flex; }
+  .modal-container {
+    background: #fff; border-radius: 22px; width: 92%; max-width: 430px;
+    padding: 28px 24px 24px; box-shadow: 0 12px 48px rgba(0,0,0,0.18);
+    position: relative; max-height: 92vh; overflow-y: auto;
+  }
+  .modal-close-btn {
+    position: absolute; top: 16px; right: 18px; background: #f2f4f6;
+    border: none; width: 30px; height: 30px; border-radius: 50%;
+    font-size: 15px; font-weight: 700; cursor: pointer; color: #6b7684;
+    display: flex; align-items: center; justify-content: center;
+  }
+  .m-badge-hot {
+    display: inline-block; background: var(--toss-soft); color: var(--toss-blue);
+    font-size: 11px; font-weight: 800; padding: 3px 8px; border-radius: 6px; margin-bottom: 8px;
+  }
+  .m-plan-title { font-size: 21px; font-weight: 800; margin-bottom: 4px; color: #191f28; }
+  .m-plan-sub { color: #8b95a1; font-size: 13.5px; margin-bottom: 14px; }
+  .m-price { font-size: 28px; font-weight: 800; color: var(--toss-blue); margin-bottom: 18px; }
+  .m-price span { font-size: 14.5px; font-weight: 500; color: #8b95a1; }
+  ul.m-features { list-style: none; padding: 0; margin: 0 0 18px; border-bottom: 1px solid #f2f4f6; }
+  ul.m-features li {
+    padding: 8px 0; font-size: 13.5px; color: #333d4b;
+    display: flex; align-items: center; gap: 8px;
+  }
+  ul.m-features li::before {
+    content: "✓"; display: inline-flex; align-items: center; justify-content: center;
+    width: 18px; height: 18px; background: var(--toss-soft); color: var(--toss-blue);
+    font-weight: 800; font-size: 11px; border-radius: 50%; flex-shrink: 0;
+  }
+  .m-method-title { font-size: 13px; font-weight: 700; color: #4e5968; margin-bottom: 8px; }
+  .m-method-group { display: flex; gap: 8px; margin-bottom: 12px; }
+  .m-method-btn {
+    flex: 1; padding: 11px 0; border-radius: 10px; border: 1.5px solid #e5e8eb;
+    background: #fff; font-size: 13px; font-weight: 700; color: #6b7684; cursor: pointer;
+  }
+  .m-method-btn.active { border-color: var(--toss-blue); color: var(--toss-blue); background: var(--toss-soft); }
+  .m-va-info {
+    display: none; background: #f9fafb; border: 1px solid #e5e8eb; border-radius: 10px;
+    padding: 10px 12px; font-size: 12px; color: #4e5968; margin-bottom: 14px; line-height: 1.45;
+  }
+  .m-pay-btn {
+    width: 100%; padding: 15px; background: var(--toss-blue); color: #fff;
+    border: none; border-radius: 12px; font-size: 15.5px; font-weight: 700; cursor: pointer;
+    box-shadow: 0 4px 12px rgba(0, 100, 255, 0.2);
+  }
+  .m-pay-btn:hover { background: #0052cc; }
+  .m-notice { font-size: 11.5px; color: #8b95a1; text-align: center; margin-top: 12px; line-height: 1.45; }
+</style>
+</head>
+<body>
+
+<div class="topbar">
+  <div class="logo" onclick="location.href='/'">
+    <span class="dot"></span>마감일 캘린더
+  </div>
+  <div class="topbar-right">
+    <button class="demo-btn" id="demoToggleBtn" title="교수님 발표 시 무료/프리미엄 상태를 자유롭게 전환하며 시연">
+      🔄 플랜 전환 시연
+    </button>
+    <div class="plan-chip" id="topPlanChip">무료 플랜 · 이번 달 2/3건 사용</div>
+  </div>
+</div>
+
+<div class="layout">
+  <!-- 좌측: 원문 패널 -->
+  <div class="panel">
+    <h2>원문 · 강의계획서 붙여넣기 (즉시 분석)</h2>
+    <textarea id="pasteBox" placeholder="공지글, 강의계획서 내용을 여기에 붙여넣으세요.">...
+1주차 ~ 2주차: 이산시간 신호와 시스템의 성질
+3주차: 중간고사 범위는 1~5장이며, 시험은
+11월 20일(목) 오후 2시에 공학관 401호에서 실시합니다.
+
+과제 2(MATLAB 필터) 설계는 11월 25일까지 LMS에 제출하며,
+지연 제출 시 일당 10% 감점이 적용됩니다.
+
+기말고사는 12월 셋째 주 중 공지 예정입니다.
+프로젝트 발표는 12월 22일(화) 수업 시간에 진행됩니다.
+퀴즈 1은 11월 6일(금)에 온라인으로 진행됩니다.
+...</textarea>
+    <div class="paste-row">
+      <button class="extract-btn" onclick="extractSchedules()">✨ 일정 뽑기 (로컬 분석)</button>
+      <button class="clear-btn" onclick="document.getElementById('pasteBox').value=''">지우기</button>
+    </div>
+    <hr class="divider" />
+    <div class="source-file">
+      <span>📄 붙여넣은 원문 · 로컬 패턴 매칭 분석</span>
+      <span style="font-size: 11px; color: var(--accent); font-weight: 700;">오프라인/API 무관 즉시 실행</span>
+    </div>
+    <div class="source-text" id="sourcePreview">원문에서 찾은 날짜 표현에 자동으로 밑줄과 형광펜이 표시됩니다.</div>
+  </div>
+
+  <!-- 우측: 추출된 일정 & 수정 패널 -->
+  <div class="panel">
+    <h2>추출된 일정 · 확인 및 수정</h2>
+    <div class="usage-banner" id="usageBanner">
+      <div>
+        <div class="msg" id="usageMsg">이번 달 무료 추출 1건 남았어요 🔥</div>
+        <div class="sub" id="usageSub">프리미엄은 무제한 + 과목별 통합 캘린더</div>
+      </div>
+      <button class="upgrade-btn" id="btnShowPremium">프리미엄 보기</button>
+    </div>
+
+    <div class="filter-row">
+      <div class="filter-chip active" data-filter="all">전체 <span id="cnt-all">0</span></div>
+      <div class="filter-chip" data-filter="warn">확인 필요 <span id="cnt-warn">0</span></div>
+      <div class="filter-chip" data-filter="ok">확인 완료 <span id="cnt-ok">0</span></div>
+      <div class="filter-chip locked" id="multiCourseChip">여러 과목 통합</div>
+    </div>
+
+    <div id="cardList"></div>
+
+    <div class="premium-feature-card" id="premiumFeatureCard">
+      <div class="ptitle" id="premiumCardTitle">🔒 여러 과목 통합 캘린더</div>
+      <div class="pdesc" id="premiumCardDesc">지금은 과목별로 따로 저장해야 해요. 프리미엄은 전공 전체를 한 캘린더로 묶어서 내보낼 수 있어요.</div>
+      <button class="btn-outline" id="btnConvertPremium">프리미엄 전환하기 · 4,900원/학기</button>
+    </div>
+  </div>
+</div>
+
+<div class="footer-wrap">
+  <div class="footer-bar">
+    <span class="selected-count" id="selCount">선택됨 0건 / 전체 0건</span>
+    <button class="export-btn" id="btnExportIcs">
+      📅 캘린더 파일 저장 (.ics)
+    </button>
+  </div>
+</div>
+
+<!-- 토스 결제 인앱 모달 레이어 -->
+<div class="modal-overlay" id="payment-modal">
+  <div class="modal-container">
+    <button class="modal-close-btn" id="btnCloseModal">✕</button>
+
+    <span class="m-badge-hot">한 학기 올패스 특별 혜택</span>
+    <div class="m-plan-title">프리미엄 플랜</div>
+    <div class="m-plan-sub">개강부터 종강까지 4개월 무제한 일정 관리</div>
+    <div class="m-price">4,900<span> 원 / 학기</span></div>
+
+    <ul class="m-features">
+      <li>마감일 추출 무제한 (강의계획서, 에타, 공지 단톡방)</li>
+      <li>과목별 통합 캘린더 (수강 중인 전 과목 한 번에)</li>
+      <li>AI/패턴 오차 자동 감지 (날짜-요일 불일치 경고)</li>
+      <li>표준 캘린더(.ics) 내보내기 (애플/구글 연동)</li>
+    </ul>
+
+    <div class="m-method-title">결제 수단 선택</div>
+    <div class="m-method-group">
+      <button class="m-method-btn active" data-method="카드">신용·체크카드</button>
+      <button class="m-method-btn" data-method="가상계좌">가상계좌</button>
+      <button class="m-method-btn" data-method="계좌이체">계좌이체</button>
+    </div>
+
+    <div id="mVaInfo" class="m-va-info">
+      💡 <strong>가상계좌:</strong> 결제 요청 시 입금 전용 가상계좌 번호가 즉시 발급됩니다. (데모 시연용 모의 입금 지원)
+    </div>
+
+    <button id="mPayBtn" class="m-pay-btn">4,900원 결제하기</button>
+    <div class="m-notice">
+      토스페이먼츠 보안 결제창이 열립니다.<br/>
+      테스트 결제 모드로 실제 금액은 청구되지 않습니다.
+    </div>
+  </div>
+</div>
+
+<script>
+  /* =========================================================================
+   * 1. 전역 상태 및 토스페이먼츠 초기화
+   * ======================================================================= */
+  const urlParams = new URLSearchParams(window.location.search);
+  let isPremium = urlParams.get("premium") === "true" || localStorage.getItem("user_tier") === "PREMIUM";
+  let clientKey = "test_ck_YOUR_CLIENT_KEY";
+  let tossPayments = null;
+  let selectedMethod = "카드";
+  let extractedItems = [];
+  let currentFilter = "all";
+
+  async function initTossSDK() {
+    try {
+      const res = await fetch("/api/config");
+      const data = await res.json();
+      if (data.clientKey && !data.clientKey.includes("YOUR_CLIENT_KEY")) {
+        clientKey = data.clientKey;
+      }
+    } catch (e) {}
+
+    try {
+      tossPayments = TossPayments(clientKey);
+    } catch (err) {
+      console.error("TossPayments 초기화 실패:", err);
+    }
+  }
+  initTossSDK();
+
+  /* =========================================================================
+   * 2. 프리미엄 플랜 UI 반영 & 시연 토글
+   * ======================================================================= */
+  function applyTierUI() {
+    const topPlanChip = document.getElementById("topPlanChip");
+    const usageBanner = document.getElementById("usageBanner");
+    const usageMsg = document.getElementById("usageMsg");
+    const usageSub = document.getElementById("usageSub");
+    const btnShowPremium = document.getElementById("btnShowPremium");
+    const multiCourseChip = document.getElementById("multiCourseChip");
+    const premiumFeatureCard = document.getElementById("premiumFeatureCard");
+    const premiumCardTitle = document.getElementById("premiumCardTitle");
+    const premiumCardDesc = document.getElementById("premiumCardDesc");
+    const btnConvertPremium = document.getElementById("btnConvertPremium");
+
+    if (isPremium) {
+      topPlanChip.className = "plan-chip premium";
+      topPlanChip.innerHTML = "👑 프리미엄 플랜 · 한 학기 무제한";
+
+      usageBanner.className = "usage-banner premium-active";
+      usageMsg.innerHTML = "🎉 프리미엄 플랜 활성화됨 (무제한 추출)";
+      usageSub.innerHTML = "개강부터 종강까지 모든 과목을 제한 없이 분석하고 저장할 수 있습니다.";
+      btnShowPremium.style.display = "none";
+
+      multiCourseChip.className = "filter-chip unlocked";
+      multiCourseChip.innerHTML = "✨ 여러 과목 통합 (활성)";
+
+      premiumFeatureCard.className = "premium-feature-card active-state";
+      premiumCardTitle.innerHTML = "✨ 여러 과목 통합 캘린더 기능 활성화됨";
+      premiumCardDesc.innerHTML = "현재 등록된 모든 과목의 일정이 단일 캘린더로 통합 연동됩니다.";
+      btnConvertPremium.style.display = "none";
+    } else {
+      topPlanChip.className = "plan-chip";
+      topPlanChip.innerHTML = "무료 플랜 · 이번 달 2/3건 사용";
+
+      usageBanner.className = "usage-banner";
+      usageMsg.innerHTML = "이번 달 무료 추출 1건 남았어요 🔥";
+      usageSub.innerHTML = "프리미엄은 무제한 + 과목별 통합 캘린더";
+      btnShowPremium.style.display = "inline-block";
+
+      multiCourseChip.className = "filter-chip locked";
+      multiCourseChip.innerHTML = "여러 과목 통합";
+
+      premiumFeatureCard.className = "premium-feature-card";
+      premiumCardTitle.innerHTML = "🔒 여러 과목 통합 캘린더";
+      premiumCardDesc.innerHTML = "지금은 과목별로 따로 저장해야 해요. 프리미엄은 전공 전체를 한 캘린더로 묶어서 내보낼 수 있어요.";
+      btnConvertPremium.style.display = "inline-block";
+    }
+  }
+
+  document.getElementById("demoToggleBtn").addEventListener("click", () => {
+    isPremium = !isPremium;
+    if (isPremium) {
+      localStorage.setItem("user_tier", "PREMIUM");
+    } else {
+      localStorage.removeItem("user_tier");
+    }
+    applyTierUI();
+  });
+
+  /* =========================================================================
+   * 3. 토스페이먼츠 결제 모달 제어
+   * ======================================================================= */
+  const modal = document.getElementById("payment-modal");
+  const mPayBtn = document.getElementById("mPayBtn");
+  const mVaInfo = document.getElementById("mVaInfo");
+
+  function openPaymentModal() { modal.classList.add("open"); }
+  function closePaymentModal() { modal.classList.remove("open"); }
+
+  document.getElementById("btnShowPremium").addEventListener("click", openPaymentModal);
+  document.getElementById("btnConvertPremium").addEventListener("click", openPaymentModal);
+  document.getElementById("btnCloseModal").addEventListener("click", closePaymentModal);
+  document.getElementById("multiCourseChip").addEventListener("click", () => {
+    if (!isPremium) {
+      if (confirm("여러 과목 통합 캘린더는 프리미엄 기능입니다.\n프리미엄 플랜(4,900원/학기)을 확인하시겠습니까?")) {
+        openPaymentModal();
+      }
+    }
+  });
+
+  document.querySelectorAll(".m-method-btn").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      document.querySelectorAll(".m-method-btn").forEach((b) => b.classList.remove("active"));
+      btn.classList.add("active");
+      selectedMethod = btn.dataset.method;
+      mVaInfo.style.display = selectedMethod === "가상계좌" ? "block" : "none";
+    });
+  });
+
+  mPayBtn.addEventListener("click", async () => {
+    if (!tossPayments) {
+      alert("토스 결제 모듈 초기화 중입니다. 잠시 후 다시 시도해주세요.");
+      return;
+    }
+
+    const orderId = "order_" + Date.now() + "_" + Math.random().toString(36).slice(2, 8);
+    const amount = 4900;
+    const orderName = "마감일 캘린더 프리미엄 플랜 (1학기)";
+
+    mPayBtn.disabled = true;
+    mPayBtn.textContent = "토스 결제창 여는 중...";
+
+    try {
+      await fetch("/api/payments/create-order", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ orderId, amount, orderName }),
+      });
+    } catch (e) {}
+
+    closePaymentModal();
+    mPayBtn.disabled = false;
+    mPayBtn.textContent = "4,900원 결제하기";
+
+    const paymentParams = {
+      amount,
+      orderId,
+      orderName,
+      customerName: "홍길동",
+      customerEmail: "student@univ.ac.kr",
+      successUrl: window.location.origin + "/payment/success",
+      failUrl: window.location.origin + "/payment/fail",
+    };
+
+    if (selectedMethod === "가상계좌") {
+      paymentParams.validHours = 72;
+    }
+
+    tossPayments.requestPayment(selectedMethod, paymentParams)
+      .catch((err) => {
+        if (err.code === "USER_CANCEL") {
+          console.log("사용자가 결제창을 닫았습니다.");
+        } else {
+          alert("결제 요청 중 오류: " + (err.message || err.code));
+        }
+      });
+  });
+
+  /* =========================================================================
+   * 4. 로컬 패턴 매칭 일정 추출 로직 (오프라인/API 무관 100% 즉시 동작)
+   * ======================================================================= */
+  const WEEKDAYS = ["일","월","화","수","목","금","토"];
+  function getActualWeekday(y, m, d) { return WEEKDAYS[new Date(y, m - 1, d).getDay()]; }
+
+  function extractSchedules() {
+    const text = document.getElementById("pasteBox").value;
+    const year = 2026;
+    const regex = /(\d{1,2})월\s?(\d{1,2})일(?:\((.)\))?/g;
+    const vague = /(\d{1,2})월\s?(첫|둘|둘째|셋|셋째|넷|넷째|마지막)\s?주/g;
+
+    let found = [];
+    let m;
+    let itemId = 1;
+
+    // 1) 정확한 날짜 매칭
+    while ((m = regex.exec(text)) !== null) {
+      const month = parseInt(m[1], 10);
+      const day = parseInt(m[2], 10);
+      const statedWeekday = m[3] || null;
+      const idx = m.index;
+      const rawMatch = m[0];
+
+      // 일정 제목 추론: 날짜 앞 20글자 발췌
+      const context = text.slice(Math.max(0, idx - 20), idx).replace(/\n/g, " ").trim();
+      let title = "일정";
+      if (context) {
+        title = context.slice(-14).trim();
+      }
+
+      const actual = getActualWeekday(year, month, day);
+      const mismatch = statedWeekday && statedWeekday !== actual;
+
+      found.push({
+        id: itemId++,
+        title: title || "일정",
+        date: `${year}-${String(month).padStart(2,"0")}-${String(day).padStart(2,"0")}`,
+        warn: !!mismatch,
+        note: mismatch ? `⚠️ "${month}월 ${day}일(${statedWeekday})"라고 적혀 있지만 실제 2026년은 ${actual}요일이에요. 날짜를 다시 확인해주세요.` : null,
+        checked: !mismatch,
+        evidence: rawMatch
+      });
+    }
+
+    // 2) 모호한 일정 매칭
+    while ((m = vague.exec(text)) !== null) {
+      found.push({
+        id: itemId++,
+        title: "기말고사 (날짜 불명확)",
+        date: "",
+        warn: true,
+        note: `⚠️ 원문에 정확한 날짜가 없어요 ("${m[1]}월 ${m[2]} 주 중"). 직접 입력해주세요.`,
+        checked: false,
+        evidence: m[0]
+      });
+    }
+
+    extractedItems = found;
+
+    if (found.length === 0) {
+      document.getElementById("cardList").innerHTML = '<div class="empty-state">날짜 표현을 찾지 못했어요. "11월 20일" 같은 형태로 적혀 있는지 확인해주세요.</div>';
+      updateCounts(0, 0, 0);
+      document.getElementById("sourcePreview").textContent = text;
+      return;
+    }
+
+    renderCards();
+
+    // 원문 하이라이트 표시
+    let highlighted = escapeHtml(text);
+    found.forEach((it) => {
+      if (it.evidence) {
+        const safeEv = escapeHtml(it.evidence);
+        highlighted = highlighted.replace(
+          safeEv,
+          `<mark class="evidence" id="ev-${it.id}">${safeEv}</mark>`
+        );
+      }
+    });
+    document.getElementById("sourcePreview").innerHTML = highlighted;
+  }
+
+  function escapeHtml(str) {
+    return str.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+  }
+
+  /* =========================================================================
+   * 5. 카드 렌더링 & 필터링
+   * ======================================================================= */
+  function renderCards() {
+    const list = document.getElementById("cardList");
+    list.innerHTML = "";
+
+    const filtered = extractedItems.filter((it) => {
+      if (currentFilter === "warn") return it.warn;
+      if (currentFilter === "ok") return !it.warn;
+      return true;
+    });
+
+    const warnCount = extractedItems.filter((it) => it.warn).length;
+    const okCount = extractedItems.length - warnCount;
+    updateCounts(extractedItems.length, warnCount, okCount);
+
+    if (filtered.length === 0) {
+      list.innerHTML = '<div class="empty-state">해당하는 일정이 없습니다.</div>';
+      updateSelected();
+      return;
+    }
+
+    filtered.forEach((it) => {
+      const card = document.createElement("div");
+      card.className = "card" + (it.warn ? " warn" : "");
+      card.innerHTML = `
+        <div class="row1">
+          <div>
+            <div class="title">${escapeHtml(it.title)}</div>
+            <div class="course">디지털신호처리</div>
+          </div>
+          <span class="badge ${it.warn ? "need" : "ok"}">${it.warn ? "확인 필요" : "확인 완료"}</span>
+        </div>
+        <div class="date-field">
+          📅 <input type="date" value="${it.date}" onchange="updateItemDate(${it.id}, this.value)" />
+        </div>
+        ${it.note ? `<div class="mismatch">${it.note}</div>` : ""}
+        <div class="card-actions">
+          <button class="view-origin" onclick="focusEvidence(${it.id})">원문에서 보기 →</button>
+          <label class="checkbox-row">
+            <input type="checkbox" ${it.checked ? "checked" : ""} onchange="toggleItemCheck(${it.id}, this.checked)" />
+            캘린더에 포함
+          </label>
+        </div>`;
+      list.appendChild(card);
+    });
+
+    updateSelected();
+  }
+
+  function updateItemDate(id, newDate) {
+    const it = extractedItems.find(item => item.id === id);
+    if (it) it.date = newDate;
+    updateSelected();
+  }
+
+  function toggleItemCheck(id, checked) {
+    const it = extractedItems.find(item => item.id === id);
+    if (it) it.checked = checked;
+    updateSelected();
+  }
+
+  function focusEvidence(id) {
+    const el = document.getElementById(`ev-${id}`);
+    if (el) {
+      el.scrollIntoView({ behavior: "smooth", block: "center" });
+      el.classList.add("highlight-active");
+      setTimeout(() => el.classList.remove("highlight-active"), 1500);
+    }
+  }
+
+  // 필터 탭 클릭
+  document.querySelectorAll(".filter-chip[data-filter]").forEach((chip) => {
+    chip.addEventListener("click", () => {
+      document.querySelectorAll(".filter-chip[data-filter]").forEach(c => c.classList.remove("active"));
+      chip.classList.add("active");
+      currentFilter = chip.dataset.filter;
+      renderCards();
+    });
+  });
+
+  function updateCounts(all, warn, ok) {
+    document.getElementById("cnt-all").textContent = all;
+    document.getElementById("cnt-warn").textContent = warn;
+    document.getElementById("cnt-ok").textContent = ok;
+  }
+
+  function updateSelected() {
+    const all = extractedItems.length;
+    const sel = extractedItems.filter(it => it.checked).length;
+    document.getElementById("selCount").textContent = `선택됨 ${sel}건 / 전체 ${all}건`;
+  }
+
+  /* =========================================================================
+   * 6. 표준 iCalendar (.ics) 파일 생성 & 다운로드
+   * ======================================================================= */
+  document.getElementById("btnExportIcs").addEventListener("click", () => {
+    const targets = extractedItems.filter(it => it.checked && it.date);
+
+    if (targets.length === 0) {
+      alert("캘린더에 포함할 날짜가 지정된 일정을 1개 이상 선택해주세요.");
+      return;
+    }
+
+    let icsContent = [
+      "BEGIN:VCALENDAR",
+      "VERSION:2.0",
+      "PRODID:-//Everytime Deadline Calendar//KR",
+      "CALSCALE:GREGORIAN",
+      "METHOD:PUBLISH",
+      "X-WR-CALNAME:과제·시험 마감 캘린더"
+    ];
+
+    const nowStr = new Date().toISOString().replace(/[-:]/g, "").split(".")[0] + "Z";
+
+    targets.forEach((it, idx) => {
+      const cleanDate = it.date.replace(/-/g, "");
+      const startDateTime = `${cleanDate}T090000`;
+      const endDateTime = `${cleanDate}T180000`;
+
+      icsContent.push(
+        "BEGIN:VEVENT",
+        `UID:deadline-${Date.now()}-${idx}@deadlinecalendar.app`,
+        `DTSTAMP:${nowStr}`,
+        `DTSTART:${startDateTime}`,
+        `DTEND:${endDateTime}`,
+        `SUMMARY:[마감] ${it.title}`,
+        `DESCRIPTION:${it.note ? it.note : "강의계획서 마감일 캘린더 추출 일정"}`,
+        "STATUS:CONFIRMED",
+        "END:VEVENT"
+      );
+    });
+
+    icsContent.push("END:VCALENDAR");
+
+    const blob = new Blob([icsContent.join("\r\n")], { type: "text/calendar;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `마감일_캘린더_${new Date().toISOString().slice(0,10)}.ics`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+
+    alert(`📅 ${targets.length}개의 일정이 .ics 파일로 다운로드되었습니다!\n더블클릭하면 캘린더 앱에 자동 등록됩니다.`);
+  });
+
+  // 페이지 로드 시 즉시 기본 텍스트 분석 실행 & UI 초기화
+  window.addEventListener("DOMContentLoaded", () => {
+    extractSchedules();
+    applyTierUI();
+  });
+</script>
+</body>
+</html>
