@@ -1,3 +1,5 @@
+// app/api/payment/confirm/route.js
+// 토스 결제창에서 돌아온 뒤, 서버가 최종 승인(confirm)하는 라우트.
 import { NextResponse } from 'next/server';
 import { notifyDiscord } from '../../../../lib/notify';
 import { setPremium, linkOrder } from '../../../../lib/store';
@@ -17,23 +19,11 @@ export async function POST(req) {
         Authorization: `Basic ${basicAuth}`,
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify({ paymentKey, orderId, amount: Number(amount) }),
+      body: JSON.stringify({ paymentKey, orderId, amount }),
     });
     const data = await res.json();
 
     if (!res.ok) {
-      // 이미 승인된 결제건(새로고침 / 재호출)인 경우 정상 처리 간주
-      if (data.code === 'ALREADY_PROCESSED_PAYMENT') {
-        console.log('[결제 재확인: 이미 승인 완료된 주문]', orderId);
-        linkOrder(orderId, DEMO_USER_ID);
-        setPremium(DEMO_USER_ID, true);
-        return NextResponse.json({
-          success: true,
-          payment: { orderId, totalAmount: Number(amount), method: '카드', status: 'DONE' },
-          alreadyProcessed: true,
-        });
-      }
-
       console.error('[결제 승인 실패]', data);
       await notifyDiscord({
         title: '❌ 결제 승인 실패',
@@ -45,20 +35,18 @@ export async function POST(req) {
     }
 
     console.log('[결제 승인 완료]', data.status, data.orderId, data.totalAmount);
-    linkOrder(data.orderId, DEMO_USER_ID); // 이 주문이 누구 것인지 기록 (취소/입금 시 역추적용)
 
-    const isVA = data.method === '가상계좌' || data.status === 'WAITING_FOR_DEPOSIT';
-    if (!isVA) {
-      setPremium(DEMO_USER_ID, true);
-    }
+    // 이 주문이 어느 유저 것인지 기록해둔다. (나중에 취소 웹훅이 올 때 이 매핑으로 유저를 찾음)
+    linkOrder(data.orderId, DEMO_USER_ID);
+    setPremium(DEMO_USER_ID, true);
 
     await notifyDiscord({
-      title: isVA ? '🏦 가상계좌 발급 완료' : '✅ 결제 승인 완료',
-      description: `${data.orderName || orderId} 결제가 ${isVA ? '가상계좌 발급(입금 대기)' : '완료'}되었습니다.`,
-      color: isVA ? 0x3182f6 : 0x57f287,
+      title: '✅ 결제 승인 완료',
+      description: `${data.orderName} 결제가 완료되었습니다.`,
+      color: 0x57f287,
       fields: [
         { name: '주문번호', value: data.orderId, inline: true },
-        { name: '금액', value: `${Number(data.totalAmount || amount).toLocaleString()}원`, inline: true },
+        { name: '금액', value: `${data.totalAmount.toLocaleString()}원`, inline: true },
         { name: '결제수단', value: data.method, inline: true },
       ],
     });
